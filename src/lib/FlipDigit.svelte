@@ -103,11 +103,4 @@
 			transform: rotateX(0deg);
 		}
 	}
-	@media (prefers-reduced-motion: reduce) {
-		.flap-top,
-		.flap-bottom {
-			animation-duration: 0.01s;
-			animation-delay: 0s;
-		}
-	}
 </style>
