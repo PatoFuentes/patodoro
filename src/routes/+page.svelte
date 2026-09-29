@@ -1,9 +1,11 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import Battery from '$lib/Battery.svelte';
 	import FlipClock from '$lib/FlipClock.svelte';
 	import Dashboard from '$lib/Dashboard.svelte';
 	import SettingsModal from '$lib/SettingsModal.svelte';
 	import TaskModal from '$lib/TaskModal.svelte';
+	import { battery } from '$lib/device-battery.svelte';
 	import { pomodoro, type Mode } from '$lib/pomodoro.svelte';
 
 	const MODES: { id: Mode; label: string }[] = [
@@ -48,6 +50,8 @@
 	onMount(() => {
 		pomodoro.setMode('clock');
 		void pomodoro.loadUser();
+		let stopBattery = () => {};
+		void battery.init().then((stop) => (stopBattery = stop));
 		const id = setInterval(pomodoro.tick, 250);
 		const onVisible = () => {
 			if (document.visibilityState === 'visible') {
@@ -61,6 +65,7 @@
 		showMenu();
 		return () => {
 			clearInterval(id);
+			stopBattery();
 			clearTimeout(hideTimer);
 			document.removeEventListener('visibilitychange', onVisible);
 			void wakeLock?.release();
@@ -97,6 +102,9 @@
 <main class:finished={pomodoro.finished}>
 	{#if pomodoro.settings.date}
 		<time class="date" datetime={dateText}>{dateText}</time>
+	{/if}
+	{#if pomodoro.settings.battery && battery.supported}
+		<div class="battery-slot"><Battery level={battery.level} charging={battery.charging} /></div>
 	{/if}
 	<button class="stage" onclick={startOrToggle} aria-label="Iniciar o pausar">
 		<FlipClock digits={pomodoro.digits} seconds={pomodoro.secondsDigits} />
@@ -137,6 +145,7 @@
 {:else if modal === 'settings'}
 	<SettingsModal
 		settings={pomodoro.settings}
+		batterySupported={battery.supported}
 		user={pomodoro.user}
 		syncState={pomodoro.syncState}
 		onchange={(patch) => pomodoro.updateSettings(patch)}
@@ -157,6 +166,11 @@
 		display: grid;
 		grid-template-rows: 1fr auto 1fr;
 		justify-items: center;
+	}
+	.battery-slot {
+		position: absolute;
+		top: 3vh;
+		right: 3vw;
 	}
 	.date {
 		grid-row: 1;

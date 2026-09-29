@@ -26,9 +26,11 @@ export interface Settings {
 	flip3d: boolean;
 	/** fecha dd-mm-aaaa sobre el reloj, en todos los modos */
 	date: boolean;
+	/** indicador de batería del dispositivo (solo donde el navegador lo permite) */
+	battery: boolean;
 }
 
-const DEFAULT_SETTINGS: Settings = { focus: 25, short: 5, long: 15, sound: true, seconds: true, flip3d: true, date: true };
+const DEFAULT_SETTINGS: Settings = { focus: 25, short: 5, long: 15, sound: true, seconds: true, flip3d: true, date: true, battery: true };
 const CYCLES_BEFORE_LONG = 4;
 const SESSIONS_KEY = 'patodoro.sessions';
 const SETTINGS_KEY = 'patodoro.settings';

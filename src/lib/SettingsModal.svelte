@@ -4,6 +4,7 @@
 
 	let {
 		settings,
+		batterySupported,
 		user,
 		syncState,
 		onchange,
@@ -14,6 +15,7 @@
 		onclose
 	}: {
 		settings: Settings;
+		batterySupported: boolean;
 		user: { email: string } | null;
 		syncState: SyncState;
 		onchange: (patch: Partial<Settings>) => void;
@@ -72,6 +74,20 @@
 		<button class="toggle" class:on={settings.date} onclick={() => onchange({ date: !settings.date })}>
 			{settings.date ? 'Activada' : 'Oculta'}
 		</button>
+	</div>
+	<div class="row">
+		<span>Batería del dispositivo</span>
+		{#if batterySupported}
+			<button
+				class="toggle"
+				class:on={settings.battery}
+				onclick={() => onchange({ battery: !settings.battery })}
+			>
+				{settings.battery ? 'Activada' : 'Oculta'}
+			</button>
+		{:else}
+			<span class="na">No disponible en este navegador</span>
+		{/if}
 	</div>
 	<div class="row">
 		<span>Animación 3D</span>
@@ -193,6 +209,10 @@
 		border-color: #e63b2e;
 		color: #fff;
 		padding: 0.7rem 1.4rem;
+	}
+	.na {
+		color: #777;
+		font-size: 0.85rem;
 	}
 	h3 {
 		margin: 1.4rem 0 0.6rem;

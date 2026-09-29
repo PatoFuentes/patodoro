@@ -41,11 +41,12 @@
 	.minutes {
 		display: flex;
 		flex-direction: column;
-		align-items: center;
-		gap: calc(var(--main) * 0.08);
+		/* los segundos quedan pegados al borde derecho del bloque de minutos */
+		align-items: flex-end;
+		gap: calc(var(--main) * 0.06);
 	}
 	.secs {
-		--h: calc(var(--main) * 0.36);
+		--h: calc(var(--main) * 0.24);
 	}
 	.pair {
 		display: flex;
