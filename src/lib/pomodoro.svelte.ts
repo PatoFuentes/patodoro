@@ -1,12 +1,19 @@
+import { authClient } from './auth-client';
+
 export type Mode = 'clock' | 'focus' | 'short' | 'long';
 type TimerMode = Exclude<Mode, 'clock'>;
 
 export interface Session {
+	id: string;
 	type: TimerMode;
 	minutes: number;
 	task: string;
 	endedAt: string;
+	/** true cuando el servidor ya lo tiene; solo importa con sesión iniciada */
+	synced?: boolean;
 }
+
+export type SyncState = 'off' | 'syncing' | 'ok' | 'error';
 
 export interface Settings {
 	focus: number;
@@ -19,6 +26,7 @@ const DEFAULT_SETTINGS: Settings = { focus: 25, short: 5, long: 15, sound: true 
 const CYCLES_BEFORE_LONG = 4;
 const SESSIONS_KEY = 'patodoro.sessions';
 const SETTINGS_KEY = 'patodoro.settings';
+const SETTINGS_AT_KEY = 'patodoro.settingsAt';
 
 function loadSettings(): Settings {
 	try {
@@ -36,9 +44,27 @@ function saveSettings(settings: Settings) {
 	}
 }
 
+function loadSettingsAt(): number {
+	try {
+		return Number(localStorage.getItem(SETTINGS_AT_KEY)) || 0;
+	} catch {
+		return 0;
+	}
+}
+
+function saveSettingsAt(at: number) {
+	try {
+		localStorage.setItem(SETTINGS_AT_KEY, String(at));
+	} catch {
+		// sin almacenamiento
+	}
+}
+
 function loadSessions(): Session[] {
 	try {
-		return JSON.parse(localStorage.getItem(SESSIONS_KEY) ?? '[]');
+		const raw: Partial<Session>[] = JSON.parse(localStorage.getItem(SESSIONS_KEY) ?? '[]');
+		// las sesiones de la fase 1 no tenían id
+		return raw.map((s) => ({ ...s, id: s.id ?? crypto.randomUUID() }) as Session);
 	} catch {
 		return [];
 	}
@@ -61,6 +87,13 @@ class Pomodoro {
 	task = $state('');
 	settings = $state<Settings>(loadSettings());
 	sessions = $state<Session[]>(loadSessions());
+	user = $state<{ email: string } | null>(null);
+	syncState = $state<SyncState>('off');
+
+	#settingsAt = loadSettingsAt();
+	#syncing = false;
+	#syncAgain = false;
+	#settingsTimer: ReturnType<typeof setTimeout> | undefined;
 
 	#endAt = 0;
 	#pausedMs = $state(0);
@@ -100,13 +133,115 @@ class Pomodoro {
 
 	updateSettings(patch: Partial<Settings>) {
 		this.settings = { ...this.settings, ...patch };
+		this.#settingsAt = Date.now();
 		saveSettings(this.settings);
+		saveSettingsAt(this.#settingsAt);
 		if (!this.running && this.mode !== 'clock') this.setMode(this.mode);
+		// agrupa los toques rápidos de +/- en una sola sincronización
+		clearTimeout(this.#settingsTimer);
+		this.#settingsTimer = setTimeout(() => void this.sync(), 800);
 	}
 
 	clearSessions() {
 		this.sessions = [];
 		saveSessions([]);
+		if (this.user) {
+			fetch('/api/sync', { method: 'DELETE' }).catch(() => (this.syncState = 'error'));
+		}
+	}
+
+	// --- Cuenta y sincronización (opcional: sin sesión todo sigue siendo local) ---
+
+	async loadUser() {
+		try {
+			const { data } = await authClient.getSession();
+			this.user = data?.user ? { email: data.user.email } : null;
+		} catch {
+			// sin red: se conserva el estado anterior
+		}
+		if (this.user) await this.sync();
+		else this.syncState = 'off';
+	}
+
+	async signIn(email: string, password: string): Promise<string | null> {
+		const { error } = await authClient.signIn.email({ email, password });
+		if (error) return error.message ?? 'No se pudo iniciar sesión';
+		await this.loadUser();
+		return null;
+	}
+
+	async signUp(email: string, password: string): Promise<string | null> {
+		const { error } = await authClient.signUp.email({
+			email,
+			password,
+			name: email.split('@')[0]
+		});
+		if (error) return error.message ?? 'No se pudo crear la cuenta';
+		await this.loadUser();
+		return null;
+	}
+
+	async signOut() {
+		await authClient.signOut();
+		this.user = null;
+		this.syncState = 'off';
+		// al salir, el historial local deja de considerarse respaldado
+		this.sessions = this.sessions.map((s) => ({ ...s, synced: false }));
+		saveSessions(this.sessions);
+	}
+
+	/** Sube lo pendiente (idempotente) y fusiona lo que haya en el servidor. */
+	async sync() {
+		if (!this.user) return;
+		if (this.#syncing) {
+			this.#syncAgain = true;
+			return;
+		}
+		this.#syncing = true;
+		this.syncState = 'syncing';
+		try {
+			const pending = this.sessions
+				.filter((s) => !s.synced)
+				.map(({ id, type, minutes, task, endedAt }) => ({ id, type, minutes, task, endedAt }));
+			const res = await fetch('/api/sync', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({
+					sessions: pending,
+					settings: this.#settingsAt ? { data: this.settings, updatedAt: this.#settingsAt } : undefined
+				})
+			});
+			if (res.status === 401) {
+				this.user = null;
+				this.syncState = 'off';
+				return;
+			}
+			if (!res.ok) throw new Error(String(res.status));
+			const remote: { sessions: Session[]; settings: { data: Settings; updatedAt: number } | null } =
+				await res.json();
+
+			const byId = new Map(this.sessions.map((s) => [s.id, { ...s }]));
+			for (const s of remote.sessions) byId.set(s.id, { ...s, synced: true });
+			this.sessions = [...byId.values()].sort((a, b) => a.endedAt.localeCompare(b.endedAt));
+			saveSessions(this.sessions);
+
+			if (remote.settings && remote.settings.updatedAt > this.#settingsAt) {
+				this.settings = { ...DEFAULT_SETTINGS, ...remote.settings.data };
+				this.#settingsAt = remote.settings.updatedAt;
+				saveSettings(this.settings);
+				saveSettingsAt(this.#settingsAt);
+				if (!this.running && this.mode !== 'clock') this.setMode(this.mode);
+			}
+			this.syncState = 'ok';
+		} catch {
+			this.syncState = 'error';
+		} finally {
+			this.#syncing = false;
+			if (this.#syncAgain) {
+				this.#syncAgain = false;
+				void this.sync();
+			}
+		}
 	}
 
 	tick = () => {
@@ -158,6 +293,7 @@ class Pomodoro {
 		this.sessions = [
 			...this.sessions,
 			{
+				id: crypto.randomUUID(),
 				type,
 				minutes: this.settings[type],
 				task: type === 'focus' ? this.task : '',
@@ -165,6 +301,7 @@ class Pomodoro {
 			}
 		];
 		saveSessions(this.sessions);
+		void this.sync();
 		if (this.settings.sound) this.#alarm();
 		navigator.vibrate?.([300, 150, 300, 150, 600]);
 		// deja lista la fase siguiente sin arrancarla

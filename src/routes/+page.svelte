@@ -47,11 +47,13 @@
 
 	onMount(() => {
 		pomodoro.setMode('clock');
+		void pomodoro.loadUser();
 		const id = setInterval(pomodoro.tick, 250);
 		const onVisible = () => {
 			if (document.visibilityState === 'visible') {
 				pomodoro.tick();
 				void requestWakeLock();
+				void pomodoro.sync();
 			}
 		};
 		document.addEventListener('visibilitychange', onVisible);
@@ -105,7 +107,9 @@
 		{/if}
 		<span class="sep"></span>
 		<button onclick={() => (modal = 'dashboard')}>Hoy</button>
-		<button onclick={() => (modal = 'settings')}>Ajustes</button>
+		<button onclick={() => (modal = 'settings')}>
+			Ajustes{#if pomodoro.user}<i class="dot" data-state={pomodoro.syncState}></i>{/if}
+		</button>
 	</nav>
 </main>
 
@@ -120,7 +124,13 @@
 {:else if modal === 'settings'}
 	<SettingsModal
 		settings={pomodoro.settings}
+		user={pomodoro.user}
+		syncState={pomodoro.syncState}
 		onchange={(patch) => pomodoro.updateSettings(patch)}
+		onsignin={(e, p) => pomodoro.signIn(e, p)}
+		onsignup={(e, p) => pomodoro.signUp(e, p)}
+		onsignout={() => pomodoro.signOut()}
+		onsync={() => pomodoro.sync()}
 		onclose={() => (modal = null)}
 	/>
 {/if}
@@ -182,6 +192,20 @@
 	nav button.active {
 		color: #fff;
 		border-color: #e63b2e;
+	}
+	.dot {
+		display: inline-block;
+		width: 0.5rem;
+		height: 0.5rem;
+		margin-left: 0.4rem;
+		border-radius: 50%;
+		background: #666;
+	}
+	.dot[data-state='ok'] {
+		background: #3cb043;
+	}
+	.dot[data-state='error'] {
+		background: #e6a12e;
 	}
 	.sep {
 		width: 1px;

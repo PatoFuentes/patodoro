@@ -1,13 +1,49 @@
 <script lang="ts">
 	import Modal from './Modal.svelte';
-	import type { Settings } from './pomodoro.svelte';
+	import type { Settings, SyncState } from './pomodoro.svelte';
 
 	let {
 		settings,
+		user,
+		syncState,
 		onchange,
+		onsignin,
+		onsignup,
+		onsignout,
+		onsync,
 		onclose
-	}: { settings: Settings; onchange: (patch: Partial<Settings>) => void; onclose: () => void } =
-		$props();
+	}: {
+		settings: Settings;
+		user: { email: string } | null;
+		syncState: SyncState;
+		onchange: (patch: Partial<Settings>) => void;
+		onsignin: (email: string, password: string) => Promise<string | null>;
+		onsignup: (email: string, password: string) => Promise<string | null>;
+		onsignout: () => void;
+		onsync: () => void;
+		onclose: () => void;
+	} = $props();
+
+	let creating = $state(false);
+	let email = $state('');
+	let password = $state('');
+	let error = $state<string | null>(null);
+	let busy = $state(false);
+
+	const SYNC_LABEL: Record<SyncState, string> = {
+		off: '',
+		syncing: 'Sincronizando…',
+		ok: 'Sincronizado',
+		error: 'Sin conexión: se reintentará'
+	};
+
+	async function submit(e: SubmitEvent) {
+		e.preventDefault();
+		busy = true;
+		error = await (creating ? onsignup : onsignin)(email.trim(), password);
+		busy = false;
+		if (!error) password = '';
+	}
 
 	const rows = [
 		{ key: 'focus', label: 'Foco' },
@@ -41,6 +77,53 @@
 			{settings.sound ? 'Activado' : 'Silencio'}
 		</button>
 	</div>
+
+	<h3>Cuenta</h3>
+	{#if user}
+		<div class="account">
+			<div>
+				<div class="email">{user.email}</div>
+				<div class="status" data-state={syncState}>
+					<i></i>{SYNC_LABEL[syncState]}
+				</div>
+			</div>
+			<div class="acts">
+				<button onclick={onsync} disabled={syncState === 'syncing'}>Sincronizar</button>
+				<button onclick={onsignout}>Cerrar sesión</button>
+			</div>
+		</div>
+	{:else}
+		<p class="hint">
+			Sin cuenta, tu historial vive solo en este dispositivo. Inicia sesión para sincronizarlo
+			entre dispositivos.
+		</p>
+		<form onsubmit={submit}>
+			<input
+				type="email"
+				bind:value={email}
+				placeholder="Correo"
+				autocomplete="email"
+				required
+			/>
+			<input
+				type="password"
+				bind:value={password}
+				placeholder="Contraseña (mínimo 8)"
+				autocomplete={creating ? 'new-password' : 'current-password'}
+				minlength="8"
+				required
+			/>
+			{#if error}<p class="error" role="alert">{error}</p>{/if}
+			<div class="acts">
+				<button type="button" class="link" onclick={() => ((creating = !creating), (error = null))}>
+					{creating ? 'Ya tengo cuenta' : 'Crear cuenta'}
+				</button>
+				<button class="done" type="submit" disabled={busy}>
+					{creating ? 'Crear cuenta' : 'Iniciar sesión'}
+				</button>
+			</div>
+		</form>
+	{/if}
 	<div class="actions"><button class="done" onclick={onclose}>Listo</button></div>
 </Modal>
 
@@ -84,5 +167,87 @@
 		border-color: #e63b2e;
 		color: #fff;
 		padding: 0.7rem 1.4rem;
+	}
+	h3 {
+		margin: 1.4rem 0 0.6rem;
+		font-size: 0.8rem;
+		font-weight: 500;
+		letter-spacing: 0.2em;
+		text-transform: uppercase;
+		color: #888;
+	}
+	.hint {
+		margin: 0 0 0.8rem;
+		color: #888;
+		font-size: 0.9rem;
+	}
+	.account {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		gap: 1rem;
+		flex-wrap: wrap;
+	}
+	.email {
+		color: #eee;
+	}
+	.status {
+		display: flex;
+		align-items: center;
+		gap: 0.4rem;
+		font-size: 0.85rem;
+		color: #888;
+	}
+	.status i {
+		width: 0.55rem;
+		height: 0.55rem;
+		border-radius: 50%;
+		background: #666;
+	}
+	.status[data-state='ok'] i {
+		background: #3cb043;
+	}
+	.status[data-state='ok'] {
+		color: #7fd685;
+	}
+	.status[data-state='error'] i {
+		background: #e6a12e;
+	}
+	.acts {
+		display: flex;
+		gap: 0.5rem;
+		justify-content: flex-end;
+		align-items: center;
+	}
+	form {
+		display: flex;
+		flex-direction: column;
+		gap: 0.6rem;
+	}
+	input {
+		background: #0a0a0a;
+		border: 1px solid #2a2a2a;
+		border-radius: 0.6rem;
+		color: #eee;
+		padding: 0.8rem 1rem;
+		font-size: 1rem;
+	}
+	input:focus {
+		outline: none;
+		border-color: #e63b2e;
+	}
+	.error {
+		margin: 0;
+		color: #e6795a;
+		font-size: 0.9rem;
+	}
+	.link {
+		background: none;
+		border: 0;
+		color: #999;
+		text-decoration: underline;
+	}
+	button:disabled {
+		opacity: 0.5;
 	}
 </style>

@@ -26,4 +26,18 @@ npm run build && npm start   # servidor de producción (build/index.js)
   y lista de sesiones del día. Borrar historial pide confirmación.
 - **Ajustes:** duración de foco, descanso corto y largo (1 a 120 min) y sonido.
 
-Todo se guarda en `localStorage` (`patodoro.sessions`, `patodoro.settings`); no hay base de datos.
+## Cuenta y sincronización (fase 3)
+
+Opcional: sin cuenta todo funciona local, con `localStorage`. En **Ajustes → Cuenta** se puede
+iniciar sesión (Better Auth, correo y contraseña) y el historial y los ajustes se sincronizan
+con Postgres entre dispositivos. Cada sesión lleva un id (uuid) generado en el cliente, así que
+reenviar es idempotente; los ajustes resuelven conflictos por última modificación.
+
+- Esquema: `db/schema.sql` (base `patodoro` en el Postgres compartido `apps-db` del VPS).
+- Variables de entorno: `DATABASE_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `TRUSTED_ORIGINS`,
+  `ORIGIN` (sin `ORIGIN`, adapter-node asume https y Better Auth no monta `/api/auth`).
+- `DISABLE_SIGNUP=true` cierra el registro una vez creada la cuenta propia.
+- Sin recuperación de contraseña: no hay servicio de correo configurado.
+
+Para desarrollo local se necesita un `.env` con esas variables y acceso a un Postgres
+(por ejemplo con un túnel SSH); arrancar con `node --env-file=.env build/index.js`.
