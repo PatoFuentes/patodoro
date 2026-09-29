@@ -20,9 +20,11 @@ export interface Settings {
 	short: number;
 	long: number;
 	sound: boolean;
+	/** segundos bajo los minutos en el modo Reloj */
+	seconds: boolean;
 }
 
-const DEFAULT_SETTINGS: Settings = { focus: 25, short: 5, long: 15, sound: true };
+const DEFAULT_SETTINGS: Settings = { focus: 25, short: 5, long: 15, sound: true, seconds: true };
 const CYCLES_BEFORE_LONG = 4;
 const SESSIONS_KEY = 'patodoro.sessions';
 const SETTINGS_KEY = 'patodoro.settings';
@@ -242,6 +244,13 @@ class Pomodoro {
 				void this.sync();
 			}
 		}
+	}
+
+	/** Segundos del reloj (solo modo Reloj); null cuando no corresponde mostrarlos. */
+	get secondsDigits(): [string, string] | null {
+		if (this.mode !== 'clock' || !this.settings.seconds) return null;
+		const [a, b] = String(new Date(this.now).getSeconds()).padStart(2, '0');
+		return [a, b];
 	}
 
 	tick = () => {

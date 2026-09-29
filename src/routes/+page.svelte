@@ -86,7 +86,7 @@
 
 <main class:finished={pomodoro.finished}>
 	<button class="stage" onclick={startOrToggle} aria-label="Iniciar o pausar">
-		<FlipClock digits={pomodoro.digits} />
+		<FlipClock digits={pomodoro.digits} seconds={pomodoro.secondsDigits} />
 	</button>
 	<p class="label" aria-live="polite">
 		{label}{#if pomodoro.mode === 'focus' && pomodoro.task && pomodoro.running}

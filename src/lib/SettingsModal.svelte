@@ -68,6 +68,16 @@
 		</div>
 	{/each}
 	<div class="row">
+		<span>Segundos en el reloj</span>
+		<button
+			class="toggle"
+			class:on={settings.seconds}
+			onclick={() => onchange({ seconds: !settings.seconds })}
+		>
+			{settings.seconds ? 'Activado' : 'Oculto'}
+		</button>
+	</div>
+	<div class="row">
 		<span>Sonido al terminar</span>
 		<button
 			class="toggle"

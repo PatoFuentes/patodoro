@@ -45,10 +45,15 @@ function parseSessions(raw: unknown): InSession[] | null {
 function parseSettings(raw: unknown) {
 	const s = raw as { data?: Record<string, unknown>; updatedAt?: unknown } | undefined;
 	if (!s?.data || typeof s.updatedAt !== 'number' || s.updatedAt <= 0) return null;
-	const { focus, short, long, sound } = s.data;
+	const { focus, short, long, sound, seconds } = s.data;
 	const okMin = (n: unknown) => Number.isInteger(n) && (n as number) >= 1 && (n as number) <= 120;
 	if (!okMin(focus) || !okMin(short) || !okMin(long) || typeof sound !== 'boolean') return null;
-	return { data: { focus, short, long, sound }, updatedAt: s.updatedAt };
+	// `seconds` llegó después: los clientes antiguos no lo envían
+	if (seconds !== undefined && typeof seconds !== 'boolean') return null;
+	return {
+		data: { focus, short, long, sound, seconds: seconds ?? true },
+		updatedAt: s.updatedAt
+	};
 }
 
 async function currentUserId(request: Request) {
