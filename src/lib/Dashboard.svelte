@@ -26,23 +26,33 @@
 
 	const todayStart = startOfDay(new Date());
 
-	const bounds = $derived.by(() => {
-		if (range === 'day') return { start: anchor, end: addDays(anchor, 1) };
-		if (range === 'week') {
-			const start = addDays(anchor, -((anchor.getDay() + 6) % 7)); // semana desde el lunes
+	function boundsFor(r: Range, a: Date) {
+		if (r === 'day') return { start: a, end: addDays(a, 1) };
+		if (r === 'week') {
+			const start = addDays(a, -((a.getDay() + 6) % 7)); // semana desde el lunes
 			return { start, end: addDays(start, 7) };
 		}
-		const start = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
-		return { start, end: new Date(anchor.getFullYear(), anchor.getMonth() + 1, 1) };
-	});
+		const start = new Date(a.getFullYear(), a.getMonth(), 1);
+		return { start, end: new Date(a.getFullYear(), a.getMonth() + 1, 1) };
+	}
+
+	const containsToday = (r: Range, a: Date) => {
+		const b = boundsFor(r, a);
+		return b.start <= todayStart && todayStart < b.end;
+	};
+
+	const bounds = $derived(boundsFor(range, anchor));
 
 	const canNext = $derived(bounds.end.getTime() <= todayStart.getTime());
 	const isCurrent = $derived(bounds.start <= todayStart && todayStart < bounds.end);
 
 	function move(dir: number) {
-		if (range === 'day') anchor = addDays(anchor, dir);
-		else if (range === 'week') anchor = addDays(anchor, 7 * dir);
-		else anchor = new Date(anchor.getFullYear(), anchor.getMonth() + dir, 1);
+		let next: Date;
+		if (range === 'day') next = addDays(anchor, dir);
+		else if (range === 'week') next = addDays(anchor, 7 * dir);
+		else next = new Date(anchor.getFullYear(), anchor.getMonth() + dir, 1);
+		// al llegar al período actual, el ancla vuelve a ser hoy
+		anchor = containsToday(range, next) ? todayStart : next;
 	}
 
 	function goTo(day: Date) {
@@ -51,8 +61,9 @@
 	}
 
 	function setRange(r: Range) {
+		// cambiar de vista conserva el ancla; si se estaba en el período actual, es hoy
+		if (isCurrent) anchor = todayStart;
 		range = r;
-		if (r === 'month') anchor = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
 	}
 
 	const label = $derived.by(() => {
@@ -179,7 +190,7 @@
 			<button aria-label="Anterior" onclick={() => move(-1)}>‹</button>
 			<span class="label">{label}</span>
 			<button aria-label="Siguiente" disabled={!canNext} onclick={() => move(1)}>›</button>
-			{#if !isCurrent}<button class="today" onclick={() => ((anchor = todayStart), setRange(range))}>Hoy</button>{/if}
+			{#if !isCurrent}<button class="today" onclick={() => (anchor = todayStart)}>Hoy</button>{/if}
 		</div>
 	</div>
 
