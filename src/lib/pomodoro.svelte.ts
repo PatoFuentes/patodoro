@@ -8,9 +8,33 @@ export interface Session {
 	endedAt: string;
 }
 
-const DURATIONS: Record<TimerMode, number> = { focus: 25, short: 5, long: 15 };
+export interface Settings {
+	focus: number;
+	short: number;
+	long: number;
+	sound: boolean;
+}
+
+const DEFAULT_SETTINGS: Settings = { focus: 25, short: 5, long: 15, sound: true };
 const CYCLES_BEFORE_LONG = 4;
 const SESSIONS_KEY = 'patodoro.sessions';
+const SETTINGS_KEY = 'patodoro.settings';
+
+function loadSettings(): Settings {
+	try {
+		return { ...DEFAULT_SETTINGS, ...JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? '{}') };
+	} catch {
+		return { ...DEFAULT_SETTINGS };
+	}
+}
+
+function saveSettings(settings: Settings) {
+	try {
+		localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+	} catch {
+		// sin almacenamiento: los ajustes no se recuerdan
+	}
+}
 
 function loadSessions(): Session[] {
 	try {
@@ -34,13 +58,16 @@ class Pomodoro {
 	finished = $state(false);
 	cycle = $state(0);
 	now = $state(Date.now());
+	task = $state('');
+	settings = $state<Settings>(loadSettings());
+	sessions = $state<Session[]>(loadSessions());
 
 	#endAt = 0;
-	#pausedMs = 0;
+	#pausedMs = $state(0);
 	#audio: AudioContext | null = null;
 
 	get totalMs() {
-		return this.mode === 'clock' ? 0 : DURATIONS[this.mode] * 60_000;
+		return this.mode === 'clock' ? 0 : this.settings[this.mode] * 60_000;
 	}
 
 	get remainingMs() {
@@ -64,6 +91,22 @@ class Pomodoro {
 		}
 		const [a1, a2, b1, b2] = pad(a) + pad(b);
 		return [a1, a2, b1, b2];
+	}
+
+	/** Un foco recién listo para arrancar: es el momento de preguntar la tarea. */
+	get needsTask() {
+		return this.mode === 'focus' && !this.running && this.#pausedMs === this.totalMs;
+	}
+
+	updateSettings(patch: Partial<Settings>) {
+		this.settings = { ...this.settings, ...patch };
+		saveSettings(this.settings);
+		if (!this.running && this.mode !== 'clock') this.setMode(this.mode);
+	}
+
+	clearSessions() {
+		this.sessions = [];
+		saveSessions([]);
 	}
 
 	tick = () => {
@@ -112,16 +155,17 @@ class Pomodoro {
 		this.#pausedMs = 0;
 		this.finished = true;
 		if (type === 'focus') this.cycle++;
-		const sessions = loadSessions();
-		// `task` queda vacío hasta que exista el nombre de tarea (fase 2)
-		sessions.push({
-			type,
-			minutes: DURATIONS[type],
-			task: '',
-			endedAt: new Date().toISOString()
-		});
-		saveSessions(sessions);
-		this.#alarm();
+		this.sessions = [
+			...this.sessions,
+			{
+				type,
+				minutes: this.settings[type],
+				task: type === 'focus' ? this.task : '',
+				endedAt: new Date().toISOString()
+			}
+		];
+		saveSessions(this.sessions);
+		if (this.settings.sound) this.#alarm();
 		navigator.vibrate?.([300, 150, 300, 150, 600]);
 		// deja lista la fase siguiente sin arrancarla
 		const next = this.#nextMode();

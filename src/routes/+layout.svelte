@@ -20,6 +20,7 @@
 		height: 100%;
 		background: #000;
 		color: #d8d8d8;
+		font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 		overflow: hidden;
 		-webkit-tap-highlight-color: transparent;
 		user-select: none;

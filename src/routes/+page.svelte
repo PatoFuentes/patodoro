@@ -1,6 +1,9 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import FlipClock from '$lib/FlipClock.svelte';
+	import Dashboard from '$lib/Dashboard.svelte';
+	import SettingsModal from '$lib/SettingsModal.svelte';
+	import TaskModal from '$lib/TaskModal.svelte';
 	import { pomodoro, type Mode } from '$lib/pomodoro.svelte';
 
 	const MODES: { id: Mode; label: string }[] = [
@@ -9,6 +12,20 @@
 		{ id: 'short', label: 'Corto' },
 		{ id: 'long', label: 'Largo' }
 	];
+
+	let modal = $state<'task' | 'dashboard' | 'settings' | null>(null);
+
+	/** Un foco nuevo pregunta primero la tarea; el resto alterna pausa/inicio. */
+	function startOrToggle() {
+		if (pomodoro.needsTask) modal = 'task';
+		else pomodoro.toggle();
+	}
+
+	function startWithTask(task: string) {
+		pomodoro.task = task;
+		modal = null;
+		pomodoro.toggle();
+	}
 
 	let menuVisible = $state(true);
 	let hideTimer: ReturnType<typeof setTimeout>;
@@ -66,10 +83,13 @@
 <svelte:window onpointermove={showMenu} onpointerdown={showMenu} />
 
 <main class:finished={pomodoro.finished}>
-	<button class="stage" onclick={() => pomodoro.toggle()} aria-label="Iniciar o pausar">
+	<button class="stage" onclick={startOrToggle} aria-label="Iniciar o pausar">
 		<FlipClock digits={pomodoro.digits} />
 	</button>
-	<p class="label" aria-live="polite">{label}</p>
+	<p class="label" aria-live="polite">
+		{label}{#if pomodoro.mode === 'focus' && pomodoro.task && pomodoro.running}
+			<span class="task"> · {pomodoro.task}</span>{/if}
+	</p>
 
 	<nav class:hidden={!menuVisible}>
 		{#each MODES as m (m.id)}
@@ -79,12 +99,31 @@
 		{/each}
 		{#if pomodoro.mode !== 'clock'}
 			<span class="sep"></span>
-			<button onclick={() => pomodoro.toggle()}>{pomodoro.running ? 'Pausa' : 'Iniciar'}</button>
+			<button onclick={startOrToggle}>{pomodoro.running ? 'Pausa' : 'Iniciar'}</button>
 			<button onclick={() => pomodoro.skip()}>Saltar</button>
 			<button onclick={() => pomodoro.reset()}>Reiniciar</button>
 		{/if}
+		<span class="sep"></span>
+		<button onclick={() => (modal = 'dashboard')}>Hoy</button>
+		<button onclick={() => (modal = 'settings')}>Ajustes</button>
 	</nav>
 </main>
+
+{#if modal === 'task'}
+	<TaskModal initial={pomodoro.task} onstart={startWithTask} onclose={() => (modal = null)} />
+{:else if modal === 'dashboard'}
+	<Dashboard
+		sessions={pomodoro.sessions}
+		onclear={() => pomodoro.clearSessions()}
+		onclose={() => (modal = null)}
+	/>
+{:else if modal === 'settings'}
+	<SettingsModal
+		settings={pomodoro.settings}
+		onchange={(patch) => pomodoro.updateSettings(patch)}
+		onclose={() => (modal = null)}
+	/>
+{/if}
 
 <style>
 	main {
@@ -110,6 +149,11 @@
 		letter-spacing: 0.2em;
 		text-transform: uppercase;
 		color: #666;
+	}
+	.task {
+		text-transform: none;
+		letter-spacing: 0.05em;
+		color: #999;
 	}
 	.finished .label {
 		color: #e63b2e;
