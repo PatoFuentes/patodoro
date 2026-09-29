@@ -1,5 +1,5 @@
 <script lang="ts">
-	import '@fontsource/oswald/600.css';
+	import '@fontsource/roboto-condensed/700.css';
 
 	let { children } = $props();
 </script>

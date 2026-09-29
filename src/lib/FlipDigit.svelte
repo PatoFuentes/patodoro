@@ -36,9 +36,11 @@
 		width: calc(var(--h) * 0.72);
 		height: var(--h);
 		perspective: calc(var(--h) * 3);
-		font-family: 'Oswald', sans-serif;
-		font-weight: 600;
-		font-size: calc(var(--h) * 0.86);
+		/* Roboto Condensed: el centro de sus dígitos coincide con el corte de la tarjeta (medido);
+		   Oswald quedaba ~6% de la altura del dígito por debajo del corte. */
+		font-family: 'Roboto Condensed', sans-serif;
+		font-weight: 700;
+		font-size: calc(var(--h) * 0.99);
 		line-height: 1;
 	}
 	.half {
@@ -59,6 +61,8 @@
 		align-items: center;
 		justify-content: center;
 		color: #d8d8d8;
+		/* residuo medido: el glifo quedaba ~1.3% de su altura sobre el corte */
+		transform: translateY(calc(var(--h) * 0.009));
 	}
 	.top {
 		top: 0;
