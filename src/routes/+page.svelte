@@ -145,7 +145,7 @@
 {:else if modal === 'settings'}
 	<SettingsModal
 		settings={pomodoro.settings}
-		batterySupported={battery.supported}
+		batteryStatus={battery.status}
 		user={pomodoro.user}
 		syncState={pomodoro.syncState}
 		onchange={(patch) => pomodoro.updateSettings(patch)}

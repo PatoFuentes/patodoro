@@ -1,10 +1,11 @@
 <script lang="ts">
 	import Modal from './Modal.svelte';
+	import type { BatteryStatus } from './device-battery.svelte';
 	import type { Settings, SyncState } from './pomodoro.svelte';
 
 	let {
 		settings,
-		batterySupported,
+		batteryStatus,
 		user,
 		syncState,
 		onchange,
@@ -15,7 +16,7 @@
 		onclose
 	}: {
 		settings: Settings;
-		batterySupported: boolean;
+		batteryStatus: BatteryStatus;
 		user: { email: string } | null;
 		syncState: SyncState;
 		onchange: (patch: Partial<Settings>) => void;
@@ -77,7 +78,7 @@
 	</div>
 	<div class="row">
 		<span>Batería del dispositivo</span>
-		{#if batterySupported}
+		{#if batteryStatus === 'supported'}
 			<button
 				class="toggle"
 				class:on={settings.battery}
@@ -86,9 +87,17 @@
 				{settings.battery ? 'Activada' : 'Oculta'}
 			</button>
 		{:else}
-			<span class="na">No disponible en este navegador</span>
+			<span class="na">
+				{batteryStatus === 'checking' ? 'Comprobando…' : 'No disponible en este navegador'}
+			</span>
 		{/if}
 	</div>
+	{#if batteryStatus === 'brave'}
+		<p class="note">
+			Brave oculta el nivel real de batería por privacidad y siempre informa 100 % y cargando, así
+			que no se muestra un dato falso. Ábrelo en Chrome o Edge para verlo.
+		</p>
+	{/if}
 	<div class="row">
 		<span>Animación 3D</span>
 		<button
@@ -209,6 +218,11 @@
 		border-color: #e63b2e;
 		color: #fff;
 		padding: 0.7rem 1.4rem;
+	}
+	.note {
+		margin: 0.3rem 0 0;
+		color: #888;
+		font-size: 0.8rem;
 	}
 	.na {
 		color: #777;
