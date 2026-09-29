@@ -3,8 +3,6 @@
 Reloj flip minimalista con sesiones Pomodoro, instalable como PWA en la tablet.
 SvelteKit + `adapter-node`, desplegado en el VPS `patricio` vía Coolify.
 
-Basado en [flipo](https://github.com/sajinct/flipo) de Sajin C T (MIT, ver `LICENSE`):
-la animación de volteo y el flujo Pomodoro se portan a componentes Svelte.
 
 ## Desarrollo
 
