@@ -22,8 +22,11 @@ npm run build && npm start   # servidor de producción (build/index.js)
 ## Fase 2 (hecha)
 
 - **Nombre de tarea:** al iniciar un foco nuevo se pregunta en qué vas a trabajar (opcional).
-- **Dashboard "Hoy":** focos, tiempo concentrado y de descanso, barras de los últimos 7 días
-  y lista de sesiones del día. Borrar historial pide confirmación.
+- **Historial (dashboard):** vistas Día, Semana y Mes con flechas para navegar por fechas.
+  Muestra focos, tiempo concentrado y de descanso, y racha de días con algún foco. El gráfico
+  es por hora (día), por día (semana) o un calendario de calor (mes); tocar un día abre su
+  detalle. Incluye desglose de tiempo por tarea y la lista de sesiones del día.
+  Borrar historial pide confirmación.
 - **Ajustes:** duración de foco, descanso corto y largo (1 a 120 min) y sonido.
 
 ## Cuenta y sincronización (fase 3)

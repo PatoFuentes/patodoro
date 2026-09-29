@@ -8,78 +8,264 @@
 		onclose
 	}: { sessions: Session[]; onclear: () => void; onclose: () => void } = $props();
 
+	type Range = 'day' | 'week' | 'month';
+	const RANGES: { id: Range; label: string }[] = [
+		{ id: 'day', label: 'Día' },
+		{ id: 'week', label: 'Semana' },
+		{ id: 'month', label: 'Mes' }
+	];
 	const TYPE_LABEL = { focus: 'Foco', short: 'Descanso corto', long: 'Descanso largo' } as const;
+
+	const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+	const addDays = (d: Date, n: number) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
 	const dayKey = (d: Date) => d.toLocaleDateString('sv-SE'); // YYYY-MM-DD en hora local
 
-	const today = $derived(
-		sessions.filter((s) => dayKey(new Date(s.endedAt)) === dayKey(new Date()))
+	let range = $state<Range>('day');
+	let anchor = $state(startOfDay(new Date()));
+	let confirming = $state(false);
+
+	const todayStart = startOfDay(new Date());
+
+	const bounds = $derived.by(() => {
+		if (range === 'day') return { start: anchor, end: addDays(anchor, 1) };
+		if (range === 'week') {
+			const start = addDays(anchor, -((anchor.getDay() + 6) % 7)); // semana desde el lunes
+			return { start, end: addDays(start, 7) };
+		}
+		const start = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
+		return { start, end: new Date(anchor.getFullYear(), anchor.getMonth() + 1, 1) };
+	});
+
+	const canNext = $derived(bounds.end.getTime() <= todayStart.getTime());
+	const isCurrent = $derived(bounds.start <= todayStart && todayStart < bounds.end);
+
+	function move(dir: number) {
+		if (range === 'day') anchor = addDays(anchor, dir);
+		else if (range === 'week') anchor = addDays(anchor, 7 * dir);
+		else anchor = new Date(anchor.getFullYear(), anchor.getMonth() + dir, 1);
+	}
+
+	function goTo(day: Date) {
+		range = 'day';
+		anchor = startOfDay(day);
+	}
+
+	function setRange(r: Range) {
+		range = r;
+		if (r === 'month') anchor = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
+	}
+
+	const label = $derived.by(() => {
+		if (range === 'day') {
+			const l = anchor.toLocaleDateString('es-CL', {
+				weekday: 'long',
+				day: 'numeric',
+				month: 'long'
+			});
+			return isCurrent ? `Hoy · ${l}` : l;
+		}
+		if (range === 'week') {
+			const f = (d: Date) => d.toLocaleDateString('es-CL', { day: 'numeric', month: 'short' });
+			return `${f(bounds.start)} – ${f(addDays(bounds.end, -1))}`;
+		}
+		return anchor.toLocaleDateString('es-CL', { month: 'long', year: 'numeric' });
+	});
+
+	const inRange = $derived(
+		sessions.filter((s) => {
+			const t = new Date(s.endedAt);
+			return t >= bounds.start && t < bounds.end;
+		})
 	);
-	const focus = $derived(today.filter((s) => s.type === 'focus'));
+	const focus = $derived(inRange.filter((s) => s.type === 'focus'));
 	const focusMin = $derived(focus.reduce((n, s) => n + s.minutes, 0));
 	const breakMin = $derived(
-		today.filter((s) => s.type !== 'focus').reduce((n, s) => n + s.minutes, 0)
+		inRange.filter((s) => s.type !== 'focus').reduce((n, s) => n + s.minutes, 0)
 	);
 
-	const week = $derived.by(() => {
-		const days = Array.from({ length: 7 }, (_, i) => {
-			const d = new Date();
-			d.setDate(d.getDate() - (6 - i));
+	/** Minutos de foco por día, sobre todo el historial (calendario y racha). */
+	const focusByDay = $derived.by(() => {
+		const map = new Map<string, number>();
+		for (const s of sessions) {
+			if (s.type !== 'focus') continue;
+			const k = dayKey(new Date(s.endedAt));
+			map.set(k, (map.get(k) ?? 0) + s.minutes);
+		}
+		return map;
+	});
+
+	/** Días seguidos con algún foco; si hoy aún no hay, cuenta desde ayer. */
+	const streak = $derived.by(() => {
+		let day = todayStart;
+		if (!focusByDay.has(dayKey(day))) day = addDays(day, -1);
+		let n = 0;
+		while (focusByDay.has(dayKey(day))) {
+			n++;
+			day = addDays(day, -1);
+		}
+		return n;
+	});
+
+	// --- gráficos ---
+	const bars = $derived.by(() => {
+		if (range === 'day') {
+			const hours = Array.from({ length: 24 }, (_, h) => ({
+				key: String(h),
+				label: h % 6 === 0 ? String(h) : '',
+				min: 0,
+				day: null as Date | null
+			}));
+			for (const s of focus) hours[new Date(s.endedAt).getHours()].min += s.minutes;
+			return hours;
+		}
+		return Array.from({ length: 7 }, (_, i) => {
+			const d = addDays(bounds.start, i);
 			return {
 				key: dayKey(d),
 				label: d.toLocaleDateString('es-CL', { weekday: 'short' }),
-				min: 0
+				min: focusByDay.get(dayKey(d)) ?? 0,
+				day: d
 			};
 		});
-		for (const s of sessions) {
-			if (s.type !== 'focus') continue;
-			const day = days.find((d) => d.key === dayKey(new Date(s.endedAt)));
-			if (day) day.min += s.minutes;
-		}
-		return days;
 	});
-	const weekMax = $derived(Math.max(1, ...week.map((d) => d.min)));
+	const barMax = $derived(Math.max(1, ...bars.map((b) => b.min)));
+
+	const calendar = $derived.by(() => {
+		const first = bounds.start;
+		const lead = (first.getDay() + 6) % 7;
+		const daysInMonth = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate();
+		const cells: ({ day: Date; min: number } | null)[] = Array(lead).fill(null);
+		for (let i = 0; i < daysInMonth; i++) {
+			const d = addDays(first, i);
+			cells.push({ day: d, min: focusByDay.get(dayKey(d)) ?? 0 });
+		}
+		return cells;
+	});
+	const calMax = $derived(Math.max(1, ...calendar.map((c) => c?.min ?? 0)));
+
+	// --- por tarea ---
+	const tasks = $derived.by(() => {
+		const map = new Map<string, { min: number; count: number }>();
+		for (const s of focus) {
+			const name = s.task.trim() || 'Sin nombre';
+			const cur = map.get(name) ?? { min: 0, count: 0 };
+			cur.min += s.minutes;
+			cur.count++;
+			map.set(name, cur);
+		}
+		return [...map.entries()]
+			.map(([name, v]) => ({ name, ...v }))
+			.sort((a, b) => b.min - a.min)
+			.slice(0, 8);
+	});
+	const taskMax = $derived(Math.max(1, ...tasks.map((t) => t.min)));
 
 	const fmt = (min: number) =>
 		min >= 60 ? `${Math.floor(min / 60)} h ${min % 60} min` : `${min} min`;
 	const time = (iso: string) =>
 		new Date(iso).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', hour12: false });
-
-	let confirming = $state(false);
 </script>
 
-<Modal title="Hoy" {onclose}>
+<Modal title="Historial" wide {onclose}>
+	<div class="top">
+		<div class="tabs" role="tablist">
+			{#each RANGES as r (r.id)}
+				<button role="tab" aria-selected={range === r.id} class:on={range === r.id} onclick={() => setRange(r.id)}>
+					{r.label}
+				</button>
+			{/each}
+		</div>
+		<div class="nav">
+			<button aria-label="Anterior" onclick={() => move(-1)}>‹</button>
+			<span class="label">{label}</span>
+			<button aria-label="Siguiente" disabled={!canNext} onclick={() => move(1)}>›</button>
+			{#if !isCurrent}<button class="today" onclick={() => ((anchor = todayStart), setRange(range))}>Hoy</button>{/if}
+		</div>
+	</div>
+
 	<div class="stats">
 		<div><strong>{focus.length}</strong><span>{focus.length === 1 ? 'foco' : 'focos'}</span></div>
 		<div><strong>{fmt(focusMin)}</strong><span>concentrado</span></div>
 		<div><strong>{fmt(breakMin)}</strong><span>descanso</span></div>
+		<div><strong>{streak}</strong><span>{streak === 1 ? 'día de racha' : 'días de racha'}</span></div>
 	</div>
 
-	<div class="week" role="img" aria-label="Minutos de foco de los últimos 7 días">
-		{#each week as d (d.key)}
-			<div class="col">
-				<div
-					class="bar"
-					style="height: {Math.max(2, (d.min / weekMax) * 100)}%"
-					title="{d.min} min"
-				></div>
-				<span>{d.label}</span>
-			</div>
-		{/each}
-	</div>
-
-	{#if today.length === 0}
-		<p class="empty">Aún no hay sesiones hoy.</p>
+	{#if range === 'month'}
+		<div class="cal-head">
+			{#each ['L', 'M', 'M', 'J', 'V', 'S', 'D'] as d, i (i)}<span>{d}</span>{/each}
+		</div>
+		<div class="cal">
+			{#each calendar as c, i (i)}
+				{#if c}
+					<button
+						class="cell"
+						class:future={c.day > todayStart}
+						style="--a: {c.min ? 0.25 + 0.75 * (c.min / calMax) : 0}"
+						title="{c.day.getDate()}: {c.min} min"
+						disabled={c.day > todayStart}
+						onclick={() => goTo(c.day)}
+					>
+						{c.day.getDate()}
+					</button>
+				{:else}
+					<span></span>
+				{/if}
+			{/each}
+		</div>
 	{:else}
-		<ul>
-			{#each [...today].reverse() as s (s.endedAt)}
+		<div class="chart" class:hours={range === 'day'} role="img" aria-label="Minutos de foco">
+			{#each bars as b (b.key)}
+				<div class="col">
+					{#if b.day}
+						<button
+							class="bar"
+							style="height: {Math.max(2, (b.min / barMax) * 100)}%"
+							title="{b.min} min"
+							aria-label="{b.label}: {b.min} min"
+							onclick={() => goTo(b.day!)}
+						></button>
+					{:else}
+						<div class="bar" style="height: {Math.max(2, (b.min / barMax) * 100)}%" title="{b.min} min"></div>
+					{/if}
+					<span>{b.label}</span>
+				</div>
+			{/each}
+		</div>
+	{/if}
+
+	{#if tasks.length > 0}
+		<h3>Por tarea</h3>
+		<ul class="tasks">
+			{#each tasks as t (t.name)}
 				<li>
-					<time>{time(s.endedAt)}</time>
-					<span class="type" class:focus={s.type === 'focus'}>{TYPE_LABEL[s.type]}</span>
-					<span class="task">{s.task || (s.type === 'focus' ? 'Sin nombre' : '')}</span>
-					<span class="min">{s.minutes} min</span>
+					<div class="row">
+						<span class="name" class:none={t.name === 'Sin nombre'}>{t.name}</span>
+						<span class="min">{t.count} × · {fmt(t.min)}</span>
+					</div>
+					<div class="meter"><i style="width: {(t.min / taskMax) * 100}%"></i></div>
 				</li>
 			{/each}
 		</ul>
+	{/if}
+
+	{#if range === 'day'}
+		<h3>Sesiones</h3>
+		{#if inRange.length === 0}
+			<p class="empty">No hay sesiones este día.</p>
+		{:else}
+			<ul class="list">
+				{#each [...inRange].sort((a, b) => b.endedAt.localeCompare(a.endedAt)) as s (s.id)}
+					<li>
+						<time>{time(s.endedAt)}</time>
+						<span class="type" class:focus={s.type === 'focus'}>{TYPE_LABEL[s.type]}</span>
+						<span class="task">{s.task || (s.type === 'focus' ? 'Sin nombre' : '')}</span>
+						<span class="min">{s.minutes} min</span>
+					</li>
+				{/each}
+			</ul>
+		{/if}
+	{:else if inRange.length === 0}
+		<p class="empty">No hay sesiones en este período.</p>
 	{/if}
 
 	<div class="actions">
@@ -103,29 +289,90 @@
 </Modal>
 
 <style>
+	.top {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.8rem;
+		justify-content: space-between;
+		align-items: center;
+		margin-bottom: 1.2rem;
+	}
+	.tabs {
+		display: flex;
+		background: #0a0a0a;
+		border: 1px solid #222;
+		border-radius: 999px;
+		padding: 0.2rem;
+	}
+	.tabs button {
+		border: 0;
+		background: none;
+		color: #888;
+		padding: 0.45rem 1rem;
+		border-radius: 999px;
+		cursor: pointer;
+	}
+	.tabs button.on {
+		background: #e63b2e;
+		color: #fff;
+	}
+	.nav {
+		display: flex;
+		align-items: center;
+		gap: 0.4rem;
+	}
+	.nav button {
+		background: #1a1a1a;
+		border: 1px solid #2a2a2a;
+		color: #ccc;
+		border-radius: 999px;
+		min-width: 2.2rem;
+		padding: 0.35rem 0.7rem;
+		cursor: pointer;
+	}
+	.nav button:disabled {
+		opacity: 0.35;
+		cursor: default;
+	}
+	.label {
+		min-width: 9rem;
+		text-align: center;
+		display: inline-block;
+		color: #eee;
+	}
+	.label::first-letter {
+		text-transform: uppercase;
+	}
+	.today {
+		color: #e63b2e !important;
+		border-color: #e63b2e !important;
+	}
 	.stats {
 		display: grid;
-		grid-template-columns: repeat(3, 1fr);
+		grid-template-columns: repeat(4, 1fr);
 		gap: 0.6rem;
 		text-align: center;
 	}
 	.stats strong {
 		display: block;
-		font-size: 1.5rem;
+		font-size: 1.4rem;
 		color: #fff;
 	}
 	.stats span {
-		font-size: 0.75rem;
+		font-size: 0.7rem;
 		letter-spacing: 0.1em;
 		text-transform: uppercase;
 		color: #777;
 	}
-	.week {
+	.chart {
 		display: flex;
 		align-items: flex-end;
 		gap: 0.5rem;
-		height: 5.5rem;
-		margin: 1.4rem 0 1rem;
+		height: 6.5rem;
+		margin: 1.4rem 0 0.8rem;
+	}
+	.chart.hours {
+		gap: 0.2rem;
 	}
 	.col {
 		flex: 1;
@@ -135,26 +382,97 @@
 		justify-content: flex-end;
 		align-items: center;
 		gap: 0.3rem;
+		min-width: 0;
 	}
 	.bar {
 		width: 100%;
+		padding: 0;
+		border: 0;
 		background: #e63b2e;
 		border-radius: 3px;
 		min-height: 2px;
+	}
+	button.bar {
+		cursor: pointer;
 	}
 	.col span {
 		font-size: 0.7rem;
 		color: #777;
 		text-transform: capitalize;
+		height: 0.9rem;
+	}
+	.cal-head,
+	.cal {
+		display: grid;
+		grid-template-columns: repeat(7, 1fr);
+		gap: 0.3rem;
+	}
+	.cal-head {
+		margin: 1.2rem 0 0.3rem;
+		text-align: center;
+		font-size: 0.7rem;
+		color: #777;
+	}
+	.cell {
+		aspect-ratio: 1;
+		border: 1px solid #222;
+		border-radius: 0.4rem;
+		background: rgb(230 59 46 / var(--a));
+		color: #ddd;
+		font-size: 0.8rem;
+		cursor: pointer;
+		padding: 0;
+	}
+	.cell.future {
+		opacity: 0.3;
+		cursor: default;
+	}
+	h3 {
+		margin: 1.3rem 0 0.5rem;
+		font-size: 0.75rem;
+		font-weight: 500;
+		letter-spacing: 0.2em;
+		text-transform: uppercase;
+		color: #777;
 	}
 	ul {
 		list-style: none;
 		margin: 0;
 		padding: 0;
-		max-height: 32vh;
+	}
+	.tasks li {
+		padding: 0.35rem 0;
+	}
+	.row {
+		display: flex;
+		justify-content: space-between;
+		gap: 1rem;
+	}
+	.name {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.name.none {
+		color: #777;
+	}
+	.meter {
+		height: 4px;
+		background: #1c1c1c;
+		border-radius: 2px;
+		margin-top: 0.3rem;
+	}
+	.meter i {
+		display: block;
+		height: 100%;
+		background: #ffd21f;
+		border-radius: 2px;
+	}
+	.list {
+		max-height: 26vh;
 		overflow-y: auto;
 	}
-	li {
+	.list li {
 		display: grid;
 		grid-template-columns: 3.2rem 8.5rem 1fr auto;
 		gap: 0.5rem;
@@ -181,14 +499,15 @@
 	.empty {
 		text-align: center;
 		color: #666;
+		margin: 1.2rem 0 0;
 	}
 	.actions {
 		display: flex;
 		justify-content: space-between;
 		gap: 0.5rem;
-		margin-top: 1rem;
+		margin-top: 1.4rem;
 	}
-	button {
+	.actions button {
 		background: #1a1a1a;
 		border: 1px solid #2a2a2a;
 		color: #aaa;
@@ -196,11 +515,11 @@
 		border-radius: 999px;
 		cursor: pointer;
 	}
-	.danger {
+	.actions .danger {
 		border-color: #e63b2e;
 		color: #e63b2e;
 	}
-	.done {
+	.actions .done {
 		margin-left: auto;
 		background: #e63b2e;
 		border-color: #e63b2e;

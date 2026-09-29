@@ -106,7 +106,7 @@
 			<button onclick={() => pomodoro.reset()}>Reiniciar</button>
 		{/if}
 		<span class="sep"></span>
-		<button onclick={() => (modal = 'dashboard')}>Hoy</button>
+		<button onclick={() => (modal = 'dashboard')}>Historial</button>
 		<button onclick={() => (modal = 'settings')}>
 			Ajustes{#if pomodoro.user}<i class="dot" data-state={pomodoro.syncState}></i>{/if}
 		</button>
