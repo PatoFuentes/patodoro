@@ -14,10 +14,10 @@ npm run build && npm start   # servidor de producción (build/index.js)
 
 ## Estado
 
-- [ ] Reloj flip (`FlipDigit`, `FlipClock`)
-- [ ] Pomodoro: foco 25 / corto 5 / largo 15, con fin calculado por `Date.now()`
-- [ ] PWA: manifest, service worker, íconos PNG desde `static/icon.svg`
-- [ ] Deploy en Coolify
+- [x] Reloj flip (`FlipDigit`, `FlipClock`)
+- [x] Pomodoro: foco 25 / corto 5 / largo 15, con fin calculado por `Date.now()`
+- [x] PWA: manifest, service worker, íconos PNG (`node scripts/icons.mjs`)
+- [x] Deploy en Coolify: https://patodoro.168.129.176.183.sslip.io
 
 ## Pendiente para la fase 2 (no perder)
 
