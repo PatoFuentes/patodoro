@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#000"/>
+  <!-- tomate -->
+  <circle cx="256" cy="290" r="190" fill="#e63b2e"/>
+  <ellipse cx="190" cy="200" rx="52" ry="28" fill="#fff" opacity=".18" transform="rotate(-30 190 200)"/>
+  <!-- hojas -->
+  <path d="M256 112 C236 80 200 78 178 92 C204 98 222 112 232 128 C214 128 196 138 190 152 C216 146 240 146 256 156 C272 146 296 146 322 152 C316 138 298 128 280 128 C290 112 308 98 334 92 C312 78 276 80 256 112 Z" fill="#3c9d3f"/>
+  <rect x="250" y="78" width="12" height="40" rx="6" fill="#2b7a2e"/>
+  <!-- pato -->
+  <ellipse cx="262" cy="352" rx="98" ry="64" fill="#ffd21f"/>
+  <path d="M338 336 C368 330 384 306 372 286 C368 300 352 310 336 312 Z" fill="#ffd21f"/>
+  <path d="M190 344 C210 372 262 378 300 350 C270 392 208 392 190 344 Z" fill="#f2b705"/>
+  <circle cx="232" cy="262" r="58" fill="#ffd21f"/>
+  <path d="M182 262 C150 254 138 270 146 282 C158 294 184 290 194 280 Z" fill="#ff8a1f"/>
+  <circle cx="222" cy="250" r="9" fill="#111"/>
+  <circle cx="225" cy="247" r="3" fill="#fff"/>
+</svg>
