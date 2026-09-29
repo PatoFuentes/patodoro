@@ -77,6 +77,12 @@
 		document.title = `${a}${b}:${c}${d} · ${label} · Patodoro`;
 	});
 
+	const dateText = $derived.by(() => {
+		const d = new Date(pomodoro.now);
+		const pad = (n: number) => String(n).padStart(2, '0');
+		return `${pad(d.getDate())}-${pad(d.getMonth() + 1)}-${d.getFullYear()}`;
+	});
+
 	const label = $derived(
 		pomodoro.finished
 			? '¡Listo!'
@@ -89,6 +95,9 @@
 <svelte:window onpointermove={showMenu} onpointerdown={showMenu} />
 
 <main class:finished={pomodoro.finished}>
+	{#if pomodoro.settings.date}
+		<time class="date" datetime={dateText}>{dateText}</time>
+	{/if}
 	<button class="stage" onclick={startOrToggle} aria-label="Iniciar o pausar">
 		<FlipClock digits={pomodoro.digits} seconds={pomodoro.secondsDigits} />
 	</button>
@@ -143,12 +152,24 @@
 	main {
 		position: fixed;
 		inset: 0;
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		justify-content: center;
+		/* fila 1 (1fr) + reloj (auto) + fila 3 (1fr): el reloj queda centrado y la fecha, centrada
+		   en la fila 1, cae justo a la mitad entre el borde superior y la parte superior del reloj */
+		display: grid;
+		grid-template-rows: 1fr auto 1fr;
+		justify-items: center;
+	}
+	.date {
+		grid-row: 1;
+		align-self: center;
+		font-family: 'Roboto Condensed', sans-serif;
+		font-weight: 700;
+		font-size: clamp(1rem, 4.5vh, 2.6rem);
+		letter-spacing: 0.18em;
+		color: #777;
+		font-variant-numeric: tabular-nums;
 	}
 	.stage {
+		grid-row: 2;
 		background: none;
 		border: 0;
 		padding: 0;

@@ -68,6 +68,12 @@
 		</div>
 	{/each}
 	<div class="row">
+		<span>Fecha (dd-mm-aaaa)</span>
+		<button class="toggle" class:on={settings.date} onclick={() => onchange({ date: !settings.date })}>
+			{settings.date ? 'Activada' : 'Oculta'}
+		</button>
+	</div>
+	<div class="row">
 		<span>Animación 3D</span>
 		<button
 			class="toggle"
