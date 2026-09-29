@@ -45,13 +45,14 @@ function parseSessions(raw: unknown): InSession[] | null {
 function parseSettings(raw: unknown) {
 	const s = raw as { data?: Record<string, unknown>; updatedAt?: unknown } | undefined;
 	if (!s?.data || typeof s.updatedAt !== 'number' || s.updatedAt <= 0) return null;
-	const { focus, short, long, sound, seconds } = s.data;
+	const { focus, short, long, sound, seconds, flip3d } = s.data;
 	const okMin = (n: unknown) => Number.isInteger(n) && (n as number) >= 1 && (n as number) <= 120;
 	if (!okMin(focus) || !okMin(short) || !okMin(long) || typeof sound !== 'boolean') return null;
 	// `seconds` llegó después: los clientes antiguos no lo envían
 	if (seconds !== undefined && typeof seconds !== 'boolean') return null;
+	if (flip3d !== undefined && typeof flip3d !== 'boolean') return null;
 	return {
-		data: { focus, short, long, sound, seconds: seconds ?? true },
+		data: { focus, short, long, sound, seconds: seconds ?? true, flip3d: flip3d ?? true },
 		updatedAt: s.updatedAt
 	};
 }

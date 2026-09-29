@@ -68,6 +68,16 @@
 		</div>
 	{/each}
 	<div class="row">
+		<span>Animación 3D</span>
+		<button
+			class="toggle"
+			class:on={settings.flip3d}
+			onclick={() => onchange({ flip3d: !settings.flip3d })}
+		>
+			{settings.flip3d ? 'Activada' : 'Desactivada'}
+		</button>
+	</div>
+	<div class="row">
 		<span>Segundos en el reloj</span>
 		<button
 			class="toggle"

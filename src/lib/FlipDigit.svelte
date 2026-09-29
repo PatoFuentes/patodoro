@@ -103,4 +103,11 @@
 			transform: rotateX(0deg);
 		}
 	}
+	/* Animación 3D desactivada (Ajustes): el cambio es casi instantáneo. Se deja una duración
+	   mínima y no `animation: none` porque `onanimationend` es lo que actualiza la mitad inferior. */
+	:global([data-flip='off']) .flap-top,
+	:global([data-flip='off']) .flap-bottom {
+		animation-duration: 0.01s;
+		animation-delay: 0s;
+	}
 </style>

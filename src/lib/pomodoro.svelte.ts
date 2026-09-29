@@ -22,9 +22,11 @@ export interface Settings {
 	sound: boolean;
 	/** segundos bajo los minutos en el modo Reloj */
 	seconds: boolean;
+	/** volteo animado de los dígitos; apagado, cambian al instante */
+	flip3d: boolean;
 }
 
-const DEFAULT_SETTINGS: Settings = { focus: 25, short: 5, long: 15, sound: true, seconds: true };
+const DEFAULT_SETTINGS: Settings = { focus: 25, short: 5, long: 15, sound: true, seconds: true, flip3d: true };
 const CYCLES_BEFORE_LONG = 4;
 const SESSIONS_KEY = 'patodoro.sessions';
 const SETTINGS_KEY = 'patodoro.settings';

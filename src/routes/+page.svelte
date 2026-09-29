@@ -68,6 +68,10 @@
 	});
 
 	$effect(() => {
+		document.documentElement.dataset.flip = pomodoro.settings.flip3d ? 'on' : 'off';
+	});
+
+	$effect(() => {
 		const [a, b, c, d] = pomodoro.digits;
 		const label = MODES.find((m) => m.id === pomodoro.mode)?.label;
 		document.title = `${a}${b}:${c}${d} · ${label} · Patodoro`;
